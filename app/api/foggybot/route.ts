@@ -163,6 +163,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply });
   } catch (error) {
     console.error("FoggyBot API error:", error);
+    // fallback: if the model call fails, still return something from foggyhead's logs
+    try {
+      const kb = await getKnowledgeBase();
+      const liked = getLikedMovies(kb, 4).slice(0, 3);
+      if (liked.length > 0) {
+        const lines: string[] = [];
+        lines.push(
+          "foggybot couldn't reach the model, so you're getting raw letterboxd brain instead.",
+        );
+        lines.push("");
+        lines.push("try:");
+        for (const r of liked) {
+          const snippet = r.reviewText
+            ? selectReviewSnippet([r])
+            : undefined;
+          lines.push(
+            `• ${r.title}${
+              typeof r.rating === "number" ? ` (${r.rating}/5)` : ""
+            } - ${snippet || "foggyhead liked this more than is healthy."}`,
+          );
+        }
+        return NextResponse.json({ reply: lines.join("\n") });
+      }
+    } catch (fallbackError) {
+      console.error("FoggyBot fallback error:", fallbackError);
+    }
+
     const devDetail =
       process.env.NODE_ENV !== "production" && error instanceof Error
         ? ` (${error.message})`
