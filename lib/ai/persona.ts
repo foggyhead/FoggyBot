@@ -1,4 +1,5 @@
-import type { KnowledgeBase, BaseReview } from "../data/knowledge-base";
+import type { KnowledgeBase } from "../data/knowledge-base";
+import type { BaseReview } from "../data/reviews";
 
 export function buildSystemPrompt(_kb: KnowledgeBase): string {
   return [
