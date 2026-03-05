@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "FoggyBot",
   description:
     "chat with foggybot, foggyhead's lowercase, gen-z, film-snob digital twin.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
