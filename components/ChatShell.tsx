@@ -359,23 +359,26 @@ export function ChatShell() {
               <AnimatePresence>
                 {showMoods && (
                   <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                    transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    className="absolute right-0 bottom-full z-10 mb-2 overflow-hidden"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="absolute right-0 bottom-full z-20 mb-2 w-[min(100%,260px)]"
                   >
-                    <div className="grid max-w-[min(280px,90vw)] grid-cols-2 gap-1.5 rounded-xl border border-white/10 bg-[#141314]/95 py-2 px-2 shadow-xl backdrop-blur-md sm:grid-cols-3 sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2.5">
-                      {MOODS.map((mood) => (
-                        <button
-                          key={mood}
-                          type="button"
-                          onClick={() => handleMoodClick(mood)}
-                          className="rounded-lg bg-white/[0.06] py-1.5 px-2 text-[10px] text-neutral-300 transition hover:bg-rose-500/15 hover:text-rose-200 sm:rounded-xl sm:px-2.5 sm:py-2 sm:text-[11px]"
-                        >
-                          {mood}
-                        </button>
-                      ))}
+                    <div className="scrollbar-invisible max-h-[min(220px,45vh)] overflow-y-auto rounded-xl border border-white/10 bg-black/25 py-2 shadow-lg backdrop-blur-xl">
+                      <ul className="flex flex-col gap-0.5 px-1 py-1">
+                        {MOODS.map((mood) => (
+                          <li key={mood}>
+                            <button
+                              type="button"
+                              onClick={() => handleMoodClick(mood)}
+                              className="w-full rounded-lg px-3 py-2.5 text-left text-[11px] font-medium text-neutral-200 transition hover:bg-rose-500/20 hover:text-rose-100"
+                            >
+                              {mood}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </motion.div>
                 )}
