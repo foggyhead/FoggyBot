@@ -234,11 +234,11 @@ export function ChatShell() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 text-rose-400">
               <MessageCircle className="h-4 w-4" strokeWidth={1.8} />
             </div>
-            <div className="flex min-w-0 items-baseline gap-2 overflow-hidden">
-              <h1 className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 overflow-hidden">
+              <h1 className="text-sm font-semibold tracking-tight text-white sm:text-base">
                 FoggyBot
               </h1>
-              <span className="hidden shrink-0 text-[11px] font-medium tracking-wide text-rose-300/80 sm:inline">
+              <span className="shrink-0 text-[10px] font-medium tracking-wide text-rose-300/80 sm:text-[11px]">
                 letterboxd brain
               </span>
             </div>
