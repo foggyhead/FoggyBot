@@ -348,10 +348,10 @@ export function ChatShell() {
               <button
                 type="button"
                 onClick={() => setShowMoods((s) => !s)}
-                className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-neutral-400 transition hover:border-rose-400/40 hover:bg-rose-500/10 hover:text-rose-200 sm:px-2.5"
+                className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] text-neutral-400 transition hover:border-rose-400/40 hover:bg-rose-500/10 hover:text-rose-200 sm:px-2.5 sm:text-[11px]"
               >
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline">By mood</span>
+                <span>By mood</span>
                 <ChevronDown
                   className={`h-3 w-3 shrink-0 transition-transform ${showMoods ? "rotate-180" : ""}`}
                 />
@@ -359,19 +359,19 @@ export function ChatShell() {
               <AnimatePresence>
                 {showMoods && (
                   <motion.div
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 bottom-full z-10 mb-1.5 overflow-hidden"
+                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                    transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="absolute right-0 bottom-full z-10 mb-2 overflow-hidden"
                   >
-                    <div className="flex max-w-[280px] flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-[#161516] p-2.5 shadow-lg">
+                    <div className="grid max-w-[min(280px,90vw)] grid-cols-2 gap-1.5 rounded-xl border border-white/10 bg-[#141314]/95 py-2 px-2 shadow-xl backdrop-blur-md sm:grid-cols-3 sm:gap-2 sm:rounded-2xl sm:px-2.5 sm:py-2.5">
                       {MOODS.map((mood) => (
                         <button
                           key={mood}
                           type="button"
                           onClick={() => handleMoodClick(mood)}
-                          className="rounded-xl bg-white/5 px-2.5 py-1.5 text-[11px] text-neutral-300 hover:bg-rose-500/15 hover:text-rose-200"
+                          className="rounded-lg bg-white/[0.06] py-1.5 px-2 text-[10px] text-neutral-300 transition hover:bg-rose-500/15 hover:text-rose-200 sm:rounded-xl sm:px-2.5 sm:py-2 sm:text-[11px]"
                         >
                           {mood}
                         </button>
