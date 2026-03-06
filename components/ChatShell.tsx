@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, MessageCircle, Sparkles } from "lucide-react";
 
 type Role = "user" | "assistant";
 
@@ -19,21 +20,73 @@ function useTypewriter(text: string, speed = 8) {
       setDisplayed("");
       return;
     }
-
     setDisplayed("");
     let i = 0;
     const id = setInterval(() => {
       i += 1;
       setDisplayed(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(id);
-      }
+      if (i >= text.length) clearInterval(id);
     }, speed);
-
     return () => clearInterval(id);
   }, [text, speed]);
 
   return displayed;
+}
+
+const MOODS = [
+  "existential spiral",
+  "quiet loneliness",
+  "cinematic beauty",
+  "chaos energy",
+  "soft heartbreak",
+  "brain rot cinema",
+  "body horror",
+  "emotional terrorism",
+  "psychological damage",
+  "main character syndrome",
+  "girly cinema",
+];
+
+const PLACEHOLDERS = [
+  "What did you think of Past Lives?",
+  "Should I watch Dune 2?",
+  "Recommend something for a lazy Sunday",
+  "What's the vibe of Poor Things?",
+  "Is this worth watching?",
+  "Suggest something sad and beautiful",
+  "What should I know before watching?",
+  "Any hidden gems I might like?",
+  "Thoughts on Anatomy of a Fall?",
+  "Rec for when I want to feel something",
+  "Did she like The Zone of Interest?",
+  "Something niche but good",
+  "What to avoid this weekend?",
+  "Pick something for me",
+  "Is Oppenheimer overhyped?",
+  "Recommend based on my taste",
+  "What's her take on this one?",
+  "Something to cry to",
+  "Good watch for tonight?",
+  "Worth the hype or skip?",
+  "Suggest something I wouldn't find on my own",
+  "Quick opinion on this film",
+  "What did foggyhead rate this?",
+  "Rec for existential spiral mood",
+  "Should I bother with this?",
+  "Something raw and honest",
+  "Best thing she's seen lately?",
+  "What to expect from this movie?",
+];
+
+const PLACEHOLDER_INTERVAL_MS = 2500;
+
+function getNextPlaceholderIndex(current: number, total: number): number {
+  if (total <= 1) return 0;
+  let next = Math.floor(Math.random() * total);
+  while (next === current) {
+    next = Math.floor(Math.random() * total);
+  }
+  return next;
 }
 
 export function ChatShell() {
@@ -41,42 +94,38 @@ export function ChatShell() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
-
-  const [sessionId, setSessionId] = useState("FOG-0000");
+  const [showMoods, setShowMoods] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-
-  const placeholders = [
-    "ask foggyhead about a film...",
-    "drop a film title...",
-    "roast foggyhead's taste...",
-    "ask for a recommendation...",
-  ];
+  const moodPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const n = Math.floor(1000 + Math.random() * 9000);
-    setSessionId(`FOG-${n}`);
-  }, []);
+    if (!showMoods) return;
+    function handleClick(e: MouseEvent) {
+      if (moodPanelRef.current && !moodPanelRef.current.contains(e.target as Node)) {
+        setShowMoods(false);
+      }
+    }
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [showMoods]);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
-    }, 3500);
+      setPlaceholderIndex((p) =>
+        getNextPlaceholderIndex(p, PLACEHOLDERS.length),
+      );
+    }, PLACEHOLDER_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 
-  const latestAssistant = (() => {
-    if (!typingMessageId) return undefined;
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const m = messages[i];
-      if (m.role === "assistant" && m.id === typingMessageId) return m;
-    }
-    return undefined;
-  })();
-
+  const latestAssistant = typingMessageId
+    ? messages.find((m) => m.role === "assistant" && m.id === typingMessageId)
+    : undefined;
   const latestContent = latestAssistant?.content ?? "";
   const shouldType =
-    latestAssistant && latestContent.length > 0 && latestContent.length <= 500;
-
+    latestAssistant &&
+    latestContent.length > 0 &&
+    latestContent.length <= 500;
   const typedText = useTypewriter(shouldType ? latestContent : "", 10);
 
   async function sendPrompt(raw: string) {
@@ -88,197 +137,151 @@ export function ChatShell() {
       role: "user",
       content,
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsSending(true);
 
     try {
       const history = [...messages, userMessage].slice(-8);
-      const payload = {
-        messages: history.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      };
-
       const res = await fetch("/api/foggybot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
+        }),
       });
-
       const data = (await res.json()) as { reply?: string };
       const replyText =
-        data.reply ||
-        "foggybot is in purgatory right now, bestie. the api did not vibe.";
+        data.reply || "Something went wrong on my side. Try again in a bit.";
 
       const botMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: replyText,
       };
-
       setMessages((prev) => [...prev, botMessage]);
       setTypingMessageId(botMessage.id);
     } catch {
-      const botMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content:
-          "something broke on the way to the cinema servers, bestie. try again.",
-      };
-      setMessages((prev) => [...prev, botMessage]);
-      setTypingMessageId(botMessage.id);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: "Something went wrong. Try again.",
+        },
+      ]);
+      setTypingMessageId(null);
     } finally {
       setIsSending(false);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim()) return;
-    await sendPrompt(input);
+    sendPrompt(input);
   }
 
-  async function handleMoodClick(label: string) {
-    await sendPrompt(`mood: ${label.toLowerCase()}. what should i watch tonight?`);
+  function handleMoodClick(label: string) {
+    sendPrompt(`mood: ${label.toLowerCase()}. what should i watch tonight?`);
+    setShowMoods(false);
   }
 
-  async function handleQuickCommand(
-    command: "stats" | "avoid" | "random" | "roast" | "watched",
+  function getFilmFromContext(): string {
+    const trimmed = input.trim();
+    if (trimmed) return trimmed;
+    const lastUser = messages.slice().reverse().find((m) => m.role === "user")?.content?.trim();
+    return lastUser || "";
+  }
+
+  function handleQuick(
+    command: "random" | "forme" | "peak" | "hertake",
   ) {
-    if (command === "stats") {
-      await sendPrompt("show me foggyhead's taste stats.");
-    } else if (command === "avoid") {
-      await sendPrompt("avoid something. what movies should i not watch?");
-    } else if (command === "random") {
-      await sendPrompt("surprise me with a random foggyhead pick.");
-    } else if (command === "roast") {
-      await sendPrompt("roast my taste based on what i've asked so far.");
-    } else if (command === "watched") {
-      const trimmed = input.trim();
-      const lastUser = [...messages]
-        .reverse()
-        .find((m) => m.role === "user")?.content;
-      const film = trimmed || lastUser || "";
+    const film = getFilmFromContext();
+
+    if (command === "random")
+      sendPrompt("surprise me with a random foggyhead pick.");
+    else if (command === "forme")
+      sendPrompt("rec me something — based on what I've asked or what you think I'd like.");
+    else if (command === "peak") {
       if (!film) {
-        await sendPrompt(
-          "foggyhead watched this. the user didn't type a title, so ask them which film they mean.",
-        );
+        sendPrompt("is it even peak? which film? (ask me)");
         return;
       }
-      await sendPrompt(
-        `foggyhead watched this: "${film}". answer in the exact format: foggyhead log:\\n\\nfilm: [title]\\nrating: [stars]\\nmood: [short mood tag]\\nnote: [one-line opinion]. keep everything in lowercase.`,
-      );
+      sendPrompt(`is "${film}" even peak or just overhyped? honest take.`);
+    } else if (command === "hertake") {
+      if (!film) {
+        sendPrompt("what's her take? which film? (ask me)");
+        return;
+      }
+      sendPrompt(`what's foggyhead's take on "${film}"?`);
     }
   }
 
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(204,255,0,0.16),_transparent_60%)] px-4 py-6">
+    <div className="flex min-h-0 flex-1 flex-col px-3 py-4 sm:px-4 sm:py-5 md:py-6">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative flex h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-[30px] border-[3px] border-[#CCFF00] bg-white/5 p-4 text-sm shadow-[0_0_32px_rgba(204,255,0,0.3)] backdrop-blur-2xl sm:p-6"
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-xl backdrop-blur-sm sm:rounded-3xl"
       >
-        <header className="mb-3 flex flex-col gap-1 text-xs uppercase tracking-[0.22em] text-neutral-300">
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="h-2 w-2 rounded-full bg-[#CCFF00] shadow-[0_0_12px_rgba(204,255,0,0.9)]" />
-            foggybot // letterboxd brain
-          </div>
-          <div className="text-[10px] font-mono text-neutral-500">
-            {sessionId} • anonymous session • cinema archive synced...
+        {/* Header */}
+        <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2.5 sm:px-5 sm:py-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 text-rose-400">
+              <MessageCircle className="h-4 w-4" strokeWidth={1.8} />
+            </div>
+            <div className="flex min-w-0 items-baseline gap-2 overflow-hidden">
+              <h1 className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">
+                FoggyBot
+              </h1>
+              <span className="hidden shrink-0 text-[11px] font-medium tracking-wide text-rose-300/80 sm:inline">
+                letterboxd brain
+              </span>
+            </div>
           </div>
         </header>
 
-        <div className="mb-3 space-y-2">
-          <div className="flex flex-wrap gap-2 text-[10px] text-neutral-400">
-            <span className="uppercase tracking-[0.2em] text-neutral-500">
-              mood check:
-            </span>
-            {[
-              "existential spiral",
-              "quiet loneliness",
-              "cinematic beauty",
-              "chaos energy",
-              "soft heartbreak",
-              "brain rot cinema",
-              "body horror",
-              "emotional terrorism",
-              "psychological damage",
-              "main character syndrome",
-              "girly cinema",
-            ].map((mood) => (
-              <motion.button
-                key={mood}
-                type="button"
-                onClick={() => handleMoodClick(mood)}
-                whileHover={{ scale: 1.05 }}
-                className="cursor-pointer rounded-full border border-[#CCFF00]/40 bg-black/50 px-3 py-1 font-mono text-[10px] lowercase text-[#CCFF00] shadow-[0_0_8px_rgba(204,255,0,0.25)] transition hover:border-[#CCFF00] hover:bg-black/70 hover:shadow-[0_0_14px_rgba(204,255,0,0.5)]"
-              >
-                {mood}
-              </motion.button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-neutral-400">
-            <span className="whitespace-nowrap uppercase tracking-[0.2em] text-neutral-500">
-              shortcuts:
-            </span>
-            <div className="scrollbar-invisible flex max-w-full flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap">
-              <button
+        {/* Shortcuts */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-white/5 px-3 py-2 sm:px-5 sm:py-2.5">
+          <span className="text-[11px] text-neutral-500">Quick ask:</span>
+          {[
+            { label: "Surprise me", cmd: "random" as const },
+            { label: "Is it peak?", cmd: "peak" as const },
+            { label: "Rec me", cmd: "forme" as const },
+            { label: "Her take?", cmd: "hertake" as const },
+          ].map(({ label, cmd }) => (
+            <button
+              key={cmd}
               type="button"
-              onClick={() => handleQuickCommand("random")}
-              className="rounded-full border border-neutral-700 bg-black/60 px-3 py-1 font-mono text-[10px] lowercase text-neutral-200 transition hover:border-[#CCFF00] hover:text-[#CCFF00]"
+              onClick={() => handleQuick(cmd)}
+              className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-neutral-300 transition hover:border-rose-400/50 hover:bg-rose-500/10 hover:text-rose-200"
             >
-              surprise me
+              {label}
             </button>
-              <button
-              type="button"
-              onClick={() => handleQuickCommand("stats")}
-              className="rounded-full border border-neutral-700 bg-black/60 px-3 py-1 font-mono text-[10px] lowercase text-neutral-200 transition hover:border-[#CCFF00] hover:text-[#CCFF00]"
-            >
-              taste stats
-            </button>
-              <button
-              type="button"
-              onClick={() => handleQuickCommand("avoid")}
-              className="rounded-full border border-neutral-700 bg-black/60 px-3 py-1 font-mono text-[10px] lowercase text-neutral-200 transition hover:border-[#CCFF00] hover:text-[#CCFF00]"
-            >
-              do not watch
-            </button>
-              <button
-              type="button"
-              onClick={() => handleQuickCommand("roast")}
-              className="rounded-full border border-neutral-700 bg-black/60 px-3 py-1 font-mono text-[10px] lowercase text-neutral-200 transition hover:border-[#CCFF00] hover:text-[#CCFF00]"
-            >
-              roast my taste
-            </button>
-              <button
-              type="button"
-              onClick={() => handleQuickCommand("watched")}
-              className="rounded-full border border-neutral-700 bg-black/60 px-3 py-1 font-mono text-[10px] lowercase text-neutral-200 transition hover:border-[#CCFF00] hover:text-[#CCFF00]"
-            >
-              foggyhead watched this
-            </button>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="scrollbar-soft flex-1 overflow-y-auto rounded-2xl bg-black/40 p-3 sm:p-4">
+        {/* Chat area */}
+        <div className="scrollbar-invisible flex min-h-[320px] flex-1 flex-col overflow-y-auto p-4 sm:p-5">
           <AnimatePresence initial={false}>
-            {messages.length === 0 && (
+            {!hasMessages && (
               <motion.div
                 key="intro"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="text-xs text-neutral-400"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="mx-auto max-w-xl rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-5 text-center text-sm text-neutral-400 sm:px-5 sm:py-6"
               >
-                say hi. ask what foggyhead thought about a film. ask for a rec.{" "}
-                <span className="text-[#CCFF00]">
-                  taste is subjective. foggyhead still has opinions.
-                </span>
+                <p className="leading-relaxed">
+                  Wondering if that film edit you saw on the ’gram or the insane fit
+                  someone pulled off in it — is actually worth the hype or just a
+                  high-budget vacuum? Ask about a director, query a movie, or pick
+                  a mood and see what foggyhead thinks.
+                </p>
               </motion.div>
             )}
 
@@ -293,26 +296,19 @@ export function ChatShell() {
               return (
                 <motion.div
                   key={m.id}
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
+                  exit={{ opacity: 0 }}
                   className={`mb-3 flex ${isUser ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-3 py-3 text-xs sm:text-sm ${
+                    className={`min-w-0 max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed sm:px-4 ${
                       isUser
-                        ? "bg-[#CCFF00] text-black"
-                        : "border-l-2 border-[#CCFF00] bg-white/5 text-neutral-100"
+                        ? "bg-rose-500/20 text-rose-50"
+                        : "border border-white/10 bg-white/[0.04] text-neutral-200"
                     }`}
                   >
-                    {!isUser && (
-                      <div className="mb-1 text-[10px] uppercase tracking-[0.25em] text-[#CCFF00]">
-                        foggybot
-                      </div>
-                    )}
-                    <p className="whitespace-pre-wrap leading-[1.6]">
-                      {displayContent}
-                    </p>
+                    <p className="break-words whitespace-pre-wrap">{displayContent}</p>
                   </div>
                 </motion.div>
               );
@@ -320,50 +316,81 @@ export function ChatShell() {
 
             {isSending && (
               <motion.div
-                key="typing-indicator"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="mt-1 flex justify-start"
+                key="typing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex justify-start"
               >
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-[10px] text-neutral-400">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#CCFF00]" />
-                  <span>foggybot is typing…</span>
+                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs text-neutral-500">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
+                  Thinking…
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
+        {/* Input */}
         <form
           onSubmit={handleSubmit}
-          className="mt-4 flex items-center gap-2 rounded-2xl border border-neutral-800 bg-black/60 px-3 py-2 text-xs text-neutral-200"
+          className="relative shrink-0 border-t border-white/10 p-2 sm:p-4"
         >
-          <span className="hidden select-none font-mono text-[#CCFF00] sm:inline">
-            foggybot&gt;
-          </span>
-          <span className="inline select-none font-mono text-[#CCFF00] sm:hidden">
-            &gt;
-          </span>
-          <input
-            className="ml-1 flex-1 bg-transparent font-mono text-xs text-neutral-100 outline-none placeholder:text-neutral-600"
-            placeholder={placeholders[placeholderIndex]}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            autoComplete="off"
-          />
-          <motion.button
-            type="submit"
-            disabled={isSending}
-            whileHover={{ scale: isSending ? 1 : 1.03 }}
-            whileTap={{ scale: isSending ? 1 : 0.97 }}
-            className="rounded-full border border-[#CCFF00]/60 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[#CCFF00] disabled:opacity-40"
-          >
-            {isSending ? "thinking..." : "send"}
-          </motion.button>
+          <div className="flex min-w-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-1.5 focus-within:border-rose-400/30 focus-within:ring-1 focus-within:ring-rose-400/20 sm:gap-2 sm:px-3 sm:py-2">
+            <input
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-neutral-500"
+              placeholder={PLACEHOLDERS[placeholderIndex]}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              autoComplete="off"
+            />
+            <div className="relative flex shrink-0 items-center gap-1" ref={moodPanelRef}>
+              <button
+                type="button"
+                onClick={() => setShowMoods((s) => !s)}
+                className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-neutral-400 transition hover:border-rose-400/40 hover:bg-rose-500/10 hover:text-rose-200 sm:px-2.5"
+              >
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">By mood</span>
+                <ChevronDown
+                  className={`h-3 w-3 shrink-0 transition-transform ${showMoods ? "rotate-180" : ""}`}
+                />
+              </button>
+              <AnimatePresence>
+                {showMoods && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 bottom-full z-10 mb-1.5 overflow-hidden"
+                  >
+                    <div className="flex max-w-[280px] flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-[#161516] p-2.5 shadow-lg">
+                      {MOODS.map((mood) => (
+                        <button
+                          key={mood}
+                          type="button"
+                          onClick={() => handleMoodClick(mood)}
+                          className="rounded-xl bg-white/5 px-2.5 py-1.5 text-[11px] text-neutral-300 hover:bg-rose-500/15 hover:text-rose-200"
+                        >
+                          {mood}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <button
+              type="submit"
+              disabled={isSending}
+              className="shrink-0 rounded-xl bg-rose-500/25 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-500/35 disabled:opacity-50 sm:px-3"
+            >
+              {isSending ? "…" : "Send"}
+            </button>
+          </div>
         </form>
       </motion.div>
     </div>
   );
 }
-

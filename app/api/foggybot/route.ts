@@ -3,6 +3,7 @@ import {
   getAvoidList,
   getKnowledgeBase,
   getLikedMovies,
+  getReviewStyleSamples,
   getTasteStats,
 } from "@/lib/data/knowledge-base";
 import {
@@ -28,6 +29,25 @@ export async function POST(req: Request) {
     const lowerUser = userMessage.toLowerCase();
 
     const contextParts: string[] = [];
+
+    // Style anchor: foggyhead's actual review writing so the model mirrors her voice
+    const styleSamples = getReviewStyleSamples(kb, 4);
+    if (styleSamples.length > 0) {
+      contextParts.push(
+        "foggyhead's review style (write in a similar tone and level of detail):",
+      );
+      for (const r of styleSamples) {
+        const snippet =
+          r.reviewText && r.reviewText.length > 200
+            ? r.reviewText.slice(0, 200) + "..."
+            : r.reviewText || "";
+        if (snippet) {
+          contextParts.push(
+            `"${r.title}"${typeof r.rating === "number" ? ` (${r.rating}/5)` : ""}: ${snippet}`,
+          );
+        }
+      }
+    }
     for (const titleKey of mentioned) {
       const reviews = kb.byTitle[titleKey];
       if (!reviews?.length) continue;
@@ -59,6 +79,11 @@ export async function POST(req: Request) {
 
     const wantsRandom =
       /surprise me|random pick|random foggyhead pick/i.test(lowerUser);
+
+    const wantsPersonalizedRec =
+      /suggest for me|pick for me|what's for me|based on what i've asked|recommend something for me/i.test(
+        lowerUser,
+      );
 
     const wantsWatchedSummary = lowerUser.includes("foggyhead watched this");
 
@@ -129,6 +154,26 @@ export async function POST(req: Request) {
       }
     }
 
+    if (wantsPersonalizedRec) {
+      const liked = getLikedMovies(kb, 3.5)
+        .slice(0, 10)
+        .map((r) => ({
+          title: r.title,
+          rating: r.rating,
+          snippet: r.reviewText ? selectReviewSnippet([r]) : undefined,
+        }));
+      if (liked.length > 0) {
+        contextParts.push(
+          "user wants a personalized rec (based on what they've asked or in general). use foggyhead's taste — here are films she liked:",
+        );
+        for (const item of liked) {
+          contextParts.push(
+            `movie: "${item.title}" | rating: ${typeof item.rating === "number" ? item.rating : "n/a"} | snippet: ${item.snippet || "no review text"}`,
+          );
+        }
+      }
+    }
+
     if (wantsWatchedSummary) {
       contextParts.push(
         "for a 'foggyhead watched this' request, respond strictly in this structure, all lowercase:",
@@ -155,8 +200,8 @@ export async function POST(req: Request) {
 
     const completion = await createChatCompletion({
       messages: allMessages,
-      temperature: 0.8,
-      maxTokens: 320,
+      temperature: 0.85,
+      maxTokens: 560,
     });
 
     const reply = completion.choices?.[0]?.message?.content ?? "";
@@ -169,11 +214,8 @@ export async function POST(req: Request) {
       const liked = getLikedMovies(kb, 4).slice(0, 3);
       if (liked.length > 0) {
         const lines: string[] = [];
-        lines.push(
-          "foggybot couldn't reach the model, so you're getting raw letterboxd brain instead.",
-        );
+        lines.push("couldn't reach the model. here are a few she liked:");
         lines.push("");
-        lines.push("try:");
         for (const r of liked) {
           const snippet = r.reviewText
             ? selectReviewSnippet([r])
@@ -181,7 +223,7 @@ export async function POST(req: Request) {
           lines.push(
             `• ${r.title}${
               typeof r.rating === "number" ? ` (${r.rating}/5)` : ""
-            } - ${snippet || "foggyhead liked this more than is healthy."}`,
+            } — ${snippet || "she liked it."}`,
           );
         }
         return NextResponse.json({ reply: lines.join("\n") });
@@ -197,8 +239,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         reply:
-          "foggybot is stuck in purgatory right now, bestie. try again later." +
-          devDetail,
+          "something went wrong. try again in a bit." + devDetail,
       },
       { status: 500 },
     );

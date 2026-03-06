@@ -1,5 +1,7 @@
 import { loadCsvReviews, type BaseReview } from "./reviews";
 import { loadRssReviews } from "./rss";
+import { loadRatings } from "./ratings";
+import { loadWatched } from "./watched";
 
 export interface KnowledgeBase {
   reviews: BaseReview[];
@@ -28,9 +30,21 @@ export async function getKnowledgeBase(): Promise<KnowledgeBase> {
   const now = Date.now();
   const needFreshRss = now - lastRssFetch > RSS_TTL_MS;
 
-  const csvPromise = cachedKb
-    ? Promise.resolve(cachedKb.reviews.filter((r) => r.source === "csv"))
-    : loadCsvReviews();
+  const staticPromise = cachedKb
+    ? Promise.resolve(
+        cachedKb.reviews.filter(
+          (r) => r.source !== "rss",
+        ),
+      )
+    : Promise.all([
+        loadCsvReviews(),
+        loadRatings(),
+        loadWatched(),
+      ]).then(([reviews, ratings, watched]) => [
+        ...reviews,
+        ...ratings,
+        ...watched,
+      ]);
 
   const rssPromise = needFreshRss
     ? loadRssReviews()
@@ -38,13 +52,16 @@ export async function getKnowledgeBase(): Promise<KnowledgeBase> {
         cachedKb?.reviews.filter((r) => r.source === "rss") || [],
       );
 
-  const [csvReviews, rssReviews] = await Promise.all([csvPromise, rssPromise]);
+  const [staticReviews, rssReviews] = await Promise.all([
+    staticPromise,
+    rssPromise,
+  ]);
 
   if (needFreshRss) {
     lastRssFetch = now;
   }
 
-  const all = [...csvReviews, ...rssReviews];
+  const all = [...staticReviews, ...rssReviews];
   const byTitle = buildByTitle(all);
 
   cachedKb = { reviews: all, byTitle };
@@ -58,6 +75,23 @@ export function getLikedMovies(
   return kb.reviews.filter(
     (r) => typeof r.rating === "number" && (r.rating as number) >= minRating,
   );
+}
+
+/** Picks reviews with substantial review text to use as style anchors (how foggyhead writes). */
+export function getReviewStyleSamples(
+  kb: KnowledgeBase,
+  count = 4,
+): BaseReview[] {
+  const withText = kb.reviews.filter(
+    (r) => r.source === "csv" && r.reviewText && r.reviewText.length >= 40,
+  );
+  if (withText.length <= count) return withText;
+  const step = Math.max(1, Math.floor(withText.length / count));
+  const out: BaseReview[] = [];
+  for (let i = 0; i < count && i * step < withText.length; i++) {
+    out.push(withText[i * step]);
+  }
+  return out;
 }
 
 export function getAvoidList(
@@ -75,7 +109,9 @@ export function getAvoidList(
 
 export function getTasteStats(kb: KnowledgeBase) {
   const rated = kb.reviews.filter(
-    (r) => typeof r.rating === "number" && r.source === "csv",
+    (r) =>
+      typeof r.rating === "number" &&
+      (r.source === "csv" || r.source === "ratings"),
   );
   const avgRating =
     rated.reduce((sum, r) => sum + (r.rating as number), 0) /
@@ -85,7 +121,10 @@ export function getTasteStats(kb: KnowledgeBase) {
   const directorCounts = new Map<string, number>();
 
   for (const r of kb.reviews) {
-    if (r.source === "csv" && typeof r.year === "number") {
+    if (
+      (r.source === "csv" || r.source === "ratings" || r.source === "watched") &&
+      typeof r.year === "number"
+    ) {
       const decadeStart = Math.floor(r.year / 10) * 10;
       const label = `${decadeStart}s`;
       decadeCounts.set(label, (decadeCounts.get(label) ?? 0) + 1);
@@ -104,7 +143,10 @@ export function getTasteStats(kb: KnowledgeBase) {
     [...directorCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
     "unknown";
 
-  const filmsLogged = kb.reviews.filter((r) => r.source === "csv").length;
+  // Count unique films across all sources (reviews + ratings + watched + rss)
+  const filmsLogged = new Set(
+    kb.reviews.map((r) => normalizeTitle(r.title)),
+  ).size;
 
   return {
     averageRating: Number(avgRating.toFixed(2)),

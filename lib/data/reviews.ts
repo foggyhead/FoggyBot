@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
 
-export type ReviewSource = "csv" | "rss";
+export type ReviewSource = "csv" | "rss" | "ratings" | "watched";
 
 export interface BaseReview {
   title: string;

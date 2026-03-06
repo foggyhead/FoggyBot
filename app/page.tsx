@@ -3,8 +3,8 @@ import { FooterSignature } from "@/components/FooterSignature";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col">
-      <div className="flex-1">
+    <main className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0c0c0c]">
+      <div className="flex min-h-0 flex-1 flex-col">
         <ChatShell />
       </div>
       <FooterSignature />

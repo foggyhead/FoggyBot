@@ -20,6 +20,7 @@ html {
 body {
   background-color: var(--background);
   color: var(--foreground);
+  overflow-x: hidden;
 }
 
 /* hide scrollbars for horizontal shortcut strip while keeping scroll behavior */
@@ -34,7 +35,7 @@ body {
 /* subtle scrollbar styling for chat log */
 .scrollbar-soft {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
+  scrollbar-color: rgba(190, 140, 155, 0.4) transparent;
 }
 
 .scrollbar-soft::-webkit-scrollbar {
@@ -46,6 +47,10 @@ body {
 }
 
 .scrollbar-soft::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.6);
+  background: rgba(190, 140, 155, 0.35);
   border-radius: 9999px;
+}
+
+.scrollbar-soft::-webkit-scrollbar-thumb:hover {
+  background: rgba(190, 140, 155, 0.5);
 }
